@@ -1,8 +1,8 @@
 class apiResponse {
     constructor(
         statusCode,
-        message="success",
         data,
+        message="success",
     ){
         this.statusCode = statusCode
         this.message = message
