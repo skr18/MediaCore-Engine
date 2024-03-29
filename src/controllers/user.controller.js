@@ -13,22 +13,23 @@ const registerUser = asyncHandler( async(req,res)=>{
     //remove encrypted password and refresh token from response
 
     const {fullName, email, username,password} = req.body
-    console.log("email: ",email)
+    //console.log("email: ",email)
     if(
         [fullName,email,username,password].some((field)=>field?.trim ==="")
     ){
         throw new apiError(400,"all fields are requried")  
     }
     
-    const isUserExist = User.findOne({
+    const isUserExist = await User.findOne({
         $or:[{ username },{ email }]
     })
     if(isUserExist){
         throw new apiError(409,"user already exists with this username or email")
     }
 
+    //console.log("req files ",req.files)
     const avatraLocalPath = req.files?.avatar[0]?.path
-    const coverImageLocalPath = req.files?.coverImage[0]?.path
+    const coverImageLocalPath = req.files?.coverImage?.[0]?.path 
     if(!avatraLocalPath){
         throw new apiError(400,"avatar is required")
     }
