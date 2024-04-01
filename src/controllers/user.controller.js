@@ -3,6 +3,7 @@ import {apiError} from "../utils/apiError.js"
 import {User} from "../models/user.model.js"
 import {uploadOnCloudinary} from "../utils/cloudinary.js"
 import { apiResponse } from "../utils/apiResponse.js"
+import jwt from "jsonwebtoken"
 
 const registerUser = asyncHandler( async(req,res)=>{
     //get users details
@@ -116,6 +117,7 @@ const loginUser = asyncHandler(async (req,res)=>{
 })
 
 const logoutUser = asyncHandler(async(req,res)=>{
+    console.log("username ",req.user)
     await User.findByIdAndUpdate(
         req.user._id,
         {
@@ -131,9 +133,36 @@ const logoutUser = asyncHandler(async(req,res)=>{
     }
 
     return res.status(200)
-            .clearCookie("accessToken",accessToken,options)
-            .clearCookie("refreshToken",refreshToken,options)
+            .clearCookie("accessToken",options)
+            .clearCookie("refreshToken",options)
             .json(new apiResponse(200,{},"user logged out successfully"))
 })
 
-export {registerUser , loginUser, logoutUser}
+const refreshAccessToekn = asyncHandler(async(req,res)=>{
+    const incommingRefreshToken = req.cookies.refreshToken || req.body.refreshToken
+    if(!incommingRefreshToken){
+        throw new apiError(400,"unauthorized request")
+    }
+    const decodedToken = jwt.verify(incommingRefreshToken,process.env.REFRESH_TOKEN_SECRET)
+    const user = await User.findById(decodedToken?._id)
+    if(!user){
+        throw new apiError(401,"invalid refresh token")
+    }
+    if(incommingRefreshToken !== user.refreshToken){
+        throw new apiError(401,"invalid refresh token")
+    }
+
+    const {accessToken,refreshToken} = await generateAccessAndRefreshToken(user._id)
+    const options ={
+        httpOnly:true,
+        secure:true
+    }
+
+    return res.status(200)
+            .cookie("accessToken",accessToken,options)
+            .cookie("refreshToken",refreshToken,options)
+            .json(new apiResponse(200,{accessToken,refreshToken},"access token refreshed successfully"))
+
+})
+
+export {registerUser , loginUser, logoutUser, refreshAccessToekn}
