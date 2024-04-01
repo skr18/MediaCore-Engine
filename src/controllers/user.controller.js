@@ -4,6 +4,7 @@ import {User} from "../models/user.model.js"
 import {uploadOnCloudinary} from "../utils/cloudinary.js"
 import { apiResponse } from "../utils/apiResponse.js"
 import jwt from "jsonwebtoken"
+import { deleteFromCloudinary } from "../utils/deleteFromCloudinary.js"
 
 const registerUser = asyncHandler( async(req,res)=>{
     //get users details
@@ -192,7 +193,10 @@ const changeAvatarImage = asyncHandler(async(req,res)=>{
     if(!avatar.url){
         throw new apiError(400,"failed to upload avatar image in cloudniary")
     }
-
+    const deletePreviousImage = await deleteFromCloudinary(req.user.avatar)
+    if(!deletePreviousImage){
+        throw new apiError("failed to delete previosu image from clodinary")
+    }
     const user = await User.findByIdAndUpdate(req.user._id,
                 {
                     $set:{
@@ -205,4 +209,80 @@ const changeAvatarImage = asyncHandler(async(req,res)=>{
     return res.status(200)
             .json(new apiResponse(200,user,"avatar updated successfully"))
 })
-export {registerUser , loginUser, logoutUser, refreshAccessToekn, changePassword, getCurrentUser, changeAvatarImage}
+
+const getUserChannelProfile = asyncHandler(async(req,res)=>{
+    const username = req.params
+    if(!username?.trim()){
+        throw new apiError("invalid username")
+    }
+
+    //mongodb aggregate pipeline to find subscribersCount, subcribedTocount
+    const channel = await User.aggregate([
+        {
+            $match:{
+                username:username.toLowerCase()
+            }
+        },
+        {
+            $lookup:{
+                from:"subcriptions",
+                localField:"_id",
+                foreignField:"channel",
+                as:"subscribers"
+            }
+        },
+        {
+            $lookup:{
+                from:"subcriptions",
+                localField:"_id",
+                foreignField:"subscriber",
+                as:"subscribedTo"
+            }
+        },
+        {
+            $addFields:{
+                subcribersCount:{
+                    $size:"$subscribers"
+                },
+                subcribedToCount:{
+                    $size:"$subscribedTo"
+                },
+                isSubcribed:{
+                    $cond:{
+                        if:{$in:[req.user?._id,"$subscribers.subscriber"]},
+                        then:true,
+                        else:false
+                    }
+                }
+            }
+        },
+        {
+            $project:{
+                username:1,
+                email:1,
+                subcribedToCount:1,
+                subcribersCount:1,
+                avatar:1,
+                isSubcribed:1
+            }
+        }
+    ])
+
+    if(!channel?.length){
+        throw new apiError(404,"username does not exists")
+    }
+
+    return res.status(200)
+            .json(new apiResponse(200,channel[0],"user channel fetched successfully"))
+})
+
+export {
+    registerUser ,
+    loginUser, 
+    logoutUser, 
+    refreshAccessToekn, 
+    changePassword, 
+    getCurrentUser, 
+    changeAvatarImage, 
+    getUserChannelProfile
+}
