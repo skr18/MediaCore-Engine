@@ -5,6 +5,7 @@ import {uploadOnCloudinary} from "../utils/cloudinary.js"
 import { apiResponse } from "../utils/apiResponse.js"
 import jwt from "jsonwebtoken"
 import { deleteFromCloudinary } from "../utils/deleteFromCloudinary.js"
+import mongoose from "mongoose"
 
 const registerUser = asyncHandler( async(req,res)=>{
     //get users details
@@ -271,9 +272,55 @@ const getUserChannelProfile = asyncHandler(async(req,res)=>{
     if(!channel?.length){
         throw new apiError(404,"username does not exists")
     }
-
+    console.log("channel ",channel[0])
     return res.status(200)
             .json(new apiResponse(200,channel[0],"user channel fetched successfully"))
+})
+
+const getWatchHistory= asyncHandler(async(req,res)=>{
+    const user = await User.aggregate([
+        {
+            $match:{
+                _id: new mongoose.Types.ObjectId(req.user._id)
+            },
+            
+        },
+        {
+            $lookup:{
+                from:"videos",
+                localField:"watchHistory",
+                foreignField:"_id",
+                as:"watchHistory",
+                pipeline:[
+                    {
+                        from:"users",
+                        localField:"owner",
+                        foreignField:"_id",
+                        as:"owner",
+                        pipeline:[
+                            {
+                                $project:{  //check by writing it outside after data is fetched , for now it get stored inside owner as per project
+                                    username:1,
+                                    email:1
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        $addFields:{
+                            owner:{
+                                $first:"$owner"
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    ])
+
+    return res
+    .status(200)
+    .json(new apiResponse(200,user[0].watchHistory,"watch history fetched successfully"))
 })
 
 export {
@@ -284,5 +331,6 @@ export {
     changePassword, 
     getCurrentUser, 
     changeAvatarImage, 
-    getUserChannelProfile
+    getUserChannelProfile,
+    getWatchHistory
 }
