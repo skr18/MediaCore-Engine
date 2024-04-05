@@ -1,6 +1,5 @@
 import mongoose , {Schema} from "mongoose";
-
-import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";
+import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";// this helps in pagination , which helps to show a range of videos or coooments
 
 const videoSchema = new Schema(
     {
