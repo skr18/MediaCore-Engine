@@ -3,8 +3,8 @@ import {Like} from "../models/like.model.js"
 import {Video} from "../models/video.model.js"
 import {Comment} from "../models/comment.model.js"
 import {Tweet} from "../models/tweet.model.js"
-import {ApiError, apiError} from "../utils/ApiError.js"
-import {ApiResponse, apiResponse} from "../utils/ApiResponse.js"
+import {ApiError, apiError} from "../utils/apiError.js"
+import {ApiResponse, apiResponse} from "../utils/apiError.js"
 import {asyncHandler} from "../utils/asyncHandler.js"
 
 const toggleVideoLike = asyncHandler(async (req, res) => {
@@ -105,7 +105,61 @@ const toggleTweetLike = asyncHandler(async (req, res) => {
 
 const getLikedVideos = asyncHandler(async (req, res) => {
     //TODO: get all liked videos
-    
+    const allLikedVideos = await Like.aggregate([
+        {
+            $match:{
+                likedBy:mongoose.Schema.ObjectId(req.user?._id)
+            }
+        },
+        {
+            $lookup:{
+                from:"videos",
+                localField:"video",
+                foreignField:"_id",
+                as:"likedVideos",
+                pipeline:[
+                    {
+                        from:"users",
+                        localField:"owner",
+                        foreignField:"_id",
+                        as:"videoOwnerInfo"
+                    },
+                    {
+                        $unwind:"$videoOwnerInfo"
+                    }
+                ]
+            }
+        },
+        {
+            $unwind:"$likedVideos"
+        },
+        {
+            $project:{
+                _id: 0,
+                likedVideo: {
+                    _id: 1,
+                    "videoFile.url": 1,
+                    "thumbnail.url": 1,
+                    owner: 1,
+                    title: 1,
+                    description: 1,
+                    views: 1,
+                    duration: 1,
+                    createdAt: 1,
+                    isPublished: 1,
+                    videoOwnerInfo: {
+                        username: 1,
+                        fullName: 1,
+                        "avatar.url": 1,
+                    },
+                },
+            }
+        }
+    ])
+
+    return res
+    .status(200)
+    .json(new apiResponse(200,{allLikedVideos},"successfully fetched all liked videos"))
 })
 
 export {
